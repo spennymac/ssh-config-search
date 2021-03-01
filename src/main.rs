@@ -6,19 +6,21 @@ use std::io::BufRead;
 use std::collections::HashSet;
 use std::hash::{Hash, Hasher};
 
+const SSH_CONFIG: &str = ".ssh/config";
+
 #[derive(Debug, PartialEq, Eq)]
 struct Entry {
     host: String,
     host_name: String,
     config: std::collections::HashMap<String,String>
 }
+
 impl Hash for Entry {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.host.hash(state);
     }
 }
 
-const SSH_CONFIG: &str = ".ssh/config";
 
 fn main() {
     let home_dir = dirs::home_dir().expect("could not get $HOME dir");
@@ -31,11 +33,12 @@ fn main() {
     let mut raw = Vec::new();
     for line in lines {
         if let Ok(line) = line {
-            let line = line.trim();
 
+            let line = line.trim();
             if line.is_empty() || line.starts_with('#'){
                 continue;
             }
+
             if line.starts_with("Host ") {
                 if !raw.is_empty() {
                     let entry = build_entry(&raw);
@@ -88,7 +91,7 @@ fn build_entry(raw : &[String])  -> Entry {
     Entry {
         host: host.to_owned(),
         host_name: hostname.to_owned(),
-        config: config
+        config
     }
 }
 
@@ -96,20 +99,17 @@ fn split(l : &str)  -> (&str, &str) {
     let white_space = l.find(char::is_whitespace);
     let equals = l.find('=');
 
-    let use_white = white_space.is_some();
-    let use_equals = equals.is_some();
-
-    if use_white && !use_equals {
-        return l.split_once(char::is_whitespace).unwrap()
+    if let Some(white_space) = white_space {
+        if let Some(equals) = equals {
+            return if white_space < equals {
+                l.split_once(char::is_whitespace).unwrap()
+            } else {
+                l.split_once('=').unwrap()
+            }
+        }
     }
 
-    if use_equals && !use_white {
-        return l.split_once('=').unwrap()
-    }
-
-    let white_space = white_space.unwrap();
-    let equals = equals.unwrap();
-    if white_space < equals {
+    if white_space.is_some() {
         l.split_once(char::is_whitespace).unwrap()
     } else {
         l.split_once('=').unwrap()
